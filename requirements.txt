@@ -1,0 +1,14 @@
+streamlit
+torch
+librosa
+pandas
+numpy
+transformers
+joblib
+audio-recorder-streamlit
+datasets
+evaluate
+scikit-learn
+noisereduce
+pyloudnorm
+soundfile

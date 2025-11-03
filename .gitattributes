@@ -1,0 +1,2 @@
+*.pkl filter=lfs diff=lfs merge=lfs -text
+distilhubert_confidence_fast/*.bin filter=lfs diff=lfs merge=lfs -text
