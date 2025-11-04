@@ -2,54 +2,56 @@ import librosa
 import numpy as np
 import noisereduce as nr
 from librosa.effects import trim
+import pandas as pd
 
 TARGET_SR = 16000
-RMS_TARGET = 0.05  
-TRIM_DB = 30       
+RMS_TARGET = 0.05
+TRIM_DB = 30
 MIN_WAVE_LEN = 1600 
 
-MIN_DURATION = 0.5 
-MAX_SILENCE_PCT = 0.8 
-MIN_SNR = 5
+MIN_DURATION = 0.5 # seconds
+MAX_SILENCE_PCT = 0.7 # 70%
+MIN_SNR = 20 # dB
 
 def estimate_snr(y, sr, frame_length=2048, hop_length=512):
-    rms = librosa.feature.rms(y=y, sr=sr, frame_length=frame_length, hop_length=hop_length)[0]
+    rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
     if len(rms) == 0:
         return 0
     signal_power = np.mean(rms**2)
-    noise_floor = np.percentile(rms**2, 10)
+    noise_floor = np.percentile(rms**2, 10) 
     snr = 10 * np.log10(signal_power / (noise_floor + 1e-12))
     return snr
 
 def load_and_preprocess_audio(path):
     try:
-        #Load and resample
+        # Load (without duration cap for quality checks)
         y, sr = librosa.load(path, sr=TARGET_SR, mono=True)
-
         duration = librosa.get_duration(y=y, sr=sr)
+        
+        # Duration
         if duration < MIN_DURATION:
             return None, TARGET_SR, f"Audio is too short. Please upload/record at least {MIN_DURATION}s."
 
-        # Using a simple energy-based silence check
-        rms = librosa.feature.rms(y=y, frame_length=2048, hop_length=512)[0]
-        if rms.size == 0:
-             return None, TARGET_SR, "Audio is empty or corrupt."
+        # Silence Pct 
+        # We'll trim the audio and see how much was left
+        y_trimmed, trim_indices = trim(y, top_db=TRIM_DB)
         
-        # Find a low RMS value to count as "silence"
-        silence_threshold_rms = np.percentile(rms, 20) 
-        silence_pct = np.sum(rms < silence_threshold_rms) / len(rms)
+        # If nothing is left after trimming, it's all silence
+        if len(y_trimmed) == 0:
+            return None, TARGET_SR, "Audio is completely silent. Please record again."
+            
+        trimmed_duration = librosa.get_duration(y=y_trimmed, sr=sr)
+        silence_pct = 1.0 - (trimmed_duration / duration)
+        
         if silence_pct > MAX_SILENCE_PCT:
             return None, TARGET_SR, f"Audio is mostly silent ({silence_pct*100:.0f}%). Please record again."
 
-        # Check 3: SNR (Noise)
+        # SNR (Noise) 
         snr = estimate_snr(y, sr=sr)
         if snr < MIN_SNR:
             return None, TARGET_SR, f"Audio is too noisy (SNR: {snr:.1f} dB). Please record in a quieter place."
 
-        #Trim silence 
-        y_trimmed, _ = trim(y, top_db=TRIM_DB)
-        
-        #Check for empty audio
+        # Check length of trimmed
         if len(y_trimmed) < MIN_WAVE_LEN:
             return None, TARGET_SR, "No speech detected after trimming silence."
 
@@ -64,11 +66,11 @@ def load_and_preprocess_audio(path):
         else:
             y_normalized = y_reduced
 
-        return y_normalized, TARGET_SR
+        return y_normalized, TARGET_SR, None 
 
     except Exception as e:
         print(f"Error processing audio file {path}: {e}")
-        return None, TARGET_SR, "Error processing audio file"
+        return None, TARGET_SR, "Error: Could not read the audio file."
 
 def pad_or_crop_audio(y, target_length):
     if len(y) > target_length:
@@ -83,11 +85,12 @@ def pad_or_crop_audio(y, target_length):
     return y
 
 def extract_acoustic_features(y, sr):
+
     try:
-        # RMS Energy (Volume)
+        # RMS Energy (Volume) 
         rms_mean = np.mean(librosa.feature.rms(y=y))
         
-        #  Pitch 
+        # Pitch 
         pitches, mags = librosa.piptrack(y=y, sr=sr)
         # Select pitches with non-zero magnitude
         pitch_vals = pitches[mags > np.median(mags)]
