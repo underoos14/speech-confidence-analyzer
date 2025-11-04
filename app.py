@@ -148,7 +148,7 @@ if model is not None and feature_extractor is not None and le is not None:
 
                     st.metric(f"Overall {label.capitalize()} Probability", f"{conf:.2f}%")
 
-                    st.subheader("Full Probability Breakdown")
+                    st.subheader("Tonality Breakdown")
                     classes = list(le.classes_)
                     prob_df = pd.DataFrame({
                         "Tone": classes,
