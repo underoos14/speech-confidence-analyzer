@@ -11,7 +11,7 @@ MIN_WAVE_LEN = 1600
 
 MIN_DURATION = 0.5 # seconds
 MAX_SILENCE_PCT = 0.7 # 70%
-MIN_SNR = 20 # dB
+MIN_SNR = 15 # dB
 
 def estimate_snr(y, sr, frame_length=2048, hop_length=512):
     rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
