@@ -107,11 +107,15 @@ if model is not None and feature_extractor is not None and le is not None:
             result = None
             waveform = None
             
-            with st.spinner("Preprocessing audio (trimming silence, reducing noise...)"):
-                waveform, sr = processing.load_and_preprocess_audio(audio_path_to_analyze)
+            with st.spinner("Preprocessing audio (trimming, denoising, quality check... 🎧)"):
+                waveform, sr, error_message = processing.load_and_preprocess_audio(audio_path_to_analyze)
+
+            if error_message:
+                st.error(f"**Analysis Failed:** {error_message}")            
+
+            elif waveform is None:
+                st.error("An unknown error occurred during preprocessing. Please try again.")
             
-            if waveform is None or len(waveform) == 0:
-                st.error("Audio is too short, silent, or corrupt to analyze. Please try a different file.")
             else:
                 st.subheader("1. Preprocessing & Feature Extraction")
                 st.caption("Processed Audio (Denoised & Trimmed)")
